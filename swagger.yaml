@@ -7,7 +7,7 @@ info:
     # Orientações
     
     ## Assinatura de payloads:
-      No contexto da API de Portabilidade de crédito, os payloads de mensagem que trafegam tanto por parte da instituição credora quanto por parte da instituição proponente devem estar assinados. Para o processo de assinatura destes payloads as instituições devem seguir as especificações de segurança publicadas no Portal do desenvolvedor  
+      No contexto da API de Portabilidade de crédito, os payloads de mensagem que trafegam tanto por parte da instituição credora quanto por parte da instituição proponente devem estar assinados. Pbeta.1ara o processo de assinatura destes payloads as instituições devem seguir as especificações de segurança publicadas no Portal do desenvolvedor  
         &nbsp;&nbsp;- Certificados exigidos para assinatura de mensagens: [[PT] Padrão de Certificados Open Finance Brasil 2.1](https://openfinancebrasil.atlassian.net/wiki/spaces/OF/pages/245694518)  
         &nbsp;&nbsp;- Como assinar o payload JWS: [Como Assinar o Payload](https://openfinancebrasil.atlassian.net/wiki/spaces/OF/pages/905740608)
     
@@ -43,13 +43,19 @@ info:
         &emsp;- Periodicidade: Valida se não houve mudança na periodicidade entre o novo contrato e o contrato original, caso tenha sido alterado a periodicidade (`PERIODICIDADE_INVALIDA`);   
         &emsp;- Campo com preenchimento incorreto: Valida se o preenchimento de alguns campos estão corretos 
         Ex.: CNPJ da instituição credora deve ser o mesmo retornado pela API de Empréstimos (`CAMPO_INCONSISTENTE`)   
+        &emsp;- Saldo devedor divergente: Valida se o preenchimento do saldo da proposta é divergente (maior ou a menor) do saldo devedor, comparado com o retornado na API de Empréstimos no instante da chamada (`VALOR_DIVERGENTE`)   
     **- Para endpoint ([POST] /portabilities/{portabilityId}/payment):**   
       &nbsp;&nbsp;**Semânticos**   
         &emsp;- Estado da portabilidade diferente de `ACCEPTED_SETTLEMENT_IN_PROGRESS` ou `PAYMENT_ISSUE` (`PAGAMENTO_EFETUADO_FORA_PRAZO`). Obs.: Caso o pagamento tenha sido feito por engano a Instituição Proponente deve solicitar o estorno.   
     **- Para endpoint ([PATCH] /portabilities/{portabilityId}/cancel):**   
       &nbsp;&nbsp;**Semânticos**   
         &emsp;- Estado da portabilidade diferente de `RECEIVED`, `PENDING` ou `ACCEPTED_SETTLEMENT_IN_PROGRESS` (`CANCELAMENTO_NÃO_EFETUADO`). Obs.: De acordo com o PRD o usuário poderá cancelar o pedido de portabilidade até a etapa de liquidação, após esta etapa não será mais permitido o cancelamento da portabilidade
-  version: 1.0.0-beta.1
+    **- Para endpoint ([POST] /portabilities/{portabilityId}/request_discharge):**   
+      &nbsp;&nbsp;**Semânticos**   
+        &emsp;-  Estado da portabilidade diferente de AWAITING_CONTRACT_DISCHARGE (SOLICITAÇÃO_NÃO_EFETUADA). Para relembrar a instituição credora que 
+          o contrato ainda está pendente de desaverbação o estado da máquina deverá ser AWAITING_CONTRACT_DISCHARGE
+
+  version: 1.0.0-beta.2
   license:
     name: Apache 2.0
     url: 'https://www.apache.org/licenses/LICENSE-2.0'
@@ -74,7 +80,7 @@ tags:
   - name: Payments
     description: 'Informa a Instituição Credora a respeito da liquidação efetuada através da STR exclusiva do OFB.'
 paths:
-  /portabilities/{portabilityId}/account-data:
+  '/portabilities/{portabilityId}/account-data':
     get:
       tags:
         - Account data
@@ -272,7 +278,7 @@ paths:
           application/jwt:
             schema:
               $ref: '#/components/schemas/RequestCreditPortabilityCancel'
-        description: Payload para comunicar a liquidação efetuada pela proponente a credora e iniciar a proxima etapa do fluxo de portabilidade de crédito.
+        description: Payload para comunicar a Instituição Credora a respeito do cancelamento da portabilidade de crédito.
         required: true
       responses:
         '200':
@@ -344,7 +350,7 @@ paths:
       security:
         - OAuth2ClientCredentials:
             - payroll-credit-portability
-  /portabilities/{portabilityId}/payment:
+  '/portabilities/{portabilityId}/payment':
     post:
       tags:
         - Payments
@@ -393,14 +399,13 @@ paths:
       security:
         - OAuth2ClientCredentials:
             - payroll-credit-portability
-    
-  /portabilities/{portabilityId}/payment-reversal:
+  '/portabilities/{portabilityId}/request-discharge':
     post:
       tags:
         - Payments
-      summary: Solicita o estorno da STR efetuada para liquidar o contrato consignado devido ao fato da Instituição Credora não ter desaverbado o contrato em tempo ábil conforme SLA definido pela SERPRO de 10 dias contados a partir da data de criação da solicitação da reserva da mergem para Instituição Proponente.
-      description: Solicita o estorno da STR efetuada para liquidar o contrato consignado.
-      operationId: payrollCreditPortabilityPostPortabilitiesPortabilityIdPaymentReversal
+      summary: Endpoint usado para relembrar a instituição credora que a desaverbação do contrato ainda está pendente. 
+      description: Relembra a instituição credora que a desaverbação do contrato junto a averbadora inda está pendente.
+      operationId: payrollCreditPortabilityPostPortabilitiesPortabilityIdRequestDischarge
       parameters:
         - $ref: '#/components/parameters/portabilityId'
         - $ref: '#/components/parameters/Authorization'
@@ -412,12 +417,12 @@ paths:
         content:
           application/jwt:
             schema:
-              $ref: '#/components/schemas/RequestCreditPortabilityPaymentReversal'
-        description: Payload para comunicar a liquidação efetuada pela proponente a credora e iniciar a proxima etapa do fluxo de portabilidade de crédito.
+              $ref: '#/components/schemas/RequestCreditPortabilityRequestDischarge'
+        description: Payload para relembra a instituição credora que a desaverbação do contrato junto a averbadora inda está pendente.
         required: true
       responses:
         '202':
-          $ref: '#/components/responses/POSTResponseCreditPortabilityPaymentReversal'
+          $ref: '#/components/responses/POSTResponseCreditPortabilityRequestDischarge'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -431,7 +436,7 @@ paths:
         '406':
           $ref: '#/components/responses/NotAcceptable'
         '422':
-          $ref: '#/components/responses/UnprocessableEntityPostPaymentReversal'
+          $ref: '#/components/responses/UnprocessableEntityPostRequestDischarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
         '504':
@@ -2060,7 +2065,7 @@ components:
                   No contexto da STR0052, utilizar o valor do campo de retorno NumCtrlSTR (Numero de Controle da STR)
         meta:
           $ref: '#/components/schemas/Meta'
-    RequestCreditPortabilityPaymentReversal:
+    RequestCreditPortabilityRequestDischarge:
       type: object
       required:
         - data
@@ -2103,7 +2108,7 @@ components:
                     description: |
                       Nome da averbadora do empréstimo consignado.
                     example: 'SERPRO'
-    POSTResponseCreditPortabilityPaymentReversal:
+    POSTResponseCreditPortabilityRequestDischarge:
       type: object
       required:
         - data
@@ -2327,14 +2332,14 @@ components:
       description: |
         Códigos de erros previstos para portabilidade de crédito:
         - PAGAMENTO_EFETUADO_FORA_PRAZO: Estado da portabilidade diferente de ACCEPTED_SETTLEMENT_IN_PROGRESS ou PAYMENT_ISSUE. Obs.: Caso o pagamento tenha sido feito por engano a Instituição Proponente deve solicitar o estorno.
-    EnumErrorsPostPaymentReversal:
+    EnumErrorsPostRequestDischarge:
       type: string
       enum:
-        - DESAVERBACAO_POSSIVEL
-      example: DESAVERBACAO_POSSIVEL
+        -  SOLICITAÇÃO_NÃO_EFETUADA
+      example:  SOLICITAÇÃO_NÃO_EFETUADA
       description: |
         Códigos de erros previstos para portabilidade de crédito:
-        - DESAVERBACAO_POSSIVEL: A Instituição credora tem um SLA de 10 dias contados apartir da comunicação do pagamento através do endpoint [POST] /portabilities/{portabilityId}/payment para realizar desaverbar o contrato consignado de empréstimo junto ao SERPRO.
+        -  SOLICITAÇÃO_NÃO_EFETUADA: A Instituição credora tem um SLA de 10 dias contados apartir da comunicação do pagamento através do endpoint [POST] /portabilities/{portabilityId}/payment para realizar desaverbar o contrato consignado de empréstimo junto ao SERPRO.
     Meta:
       type: object
       description: Meta informações referentes à API requisitada.
@@ -2511,7 +2516,7 @@ components:
               maxLength: 20
               format: date-time
               example: '2021-05-21T08:30:00Z'
-    422ResponseErrorPostPaymentReversal:
+    422ResponseErrorPostRequestDischarge:
       type: object
       required:
         - errors
@@ -2528,7 +2533,7 @@ components:
               - detail
             properties:
               code:
-                $ref: '#/components/schemas/EnumErrorsPostPaymentReversal'
+                $ref: '#/components/schemas/EnumErrorsPostRequestDischarge'
               title:
                 description: Título legível por humanos deste erro específico
                 type: string
@@ -2682,7 +2687,7 @@ components:
           schema:
             $ref: '#/components/schemas/ResponseAccountData'
     OKResponsePortabilityEligibility:
-      description: Dados dos contratos de empréstimo obtidos com sucesso.
+      description: Payload com os dados do pedido de portabilidade de crédito.
       headers:
         x-fapi-interaction-id:
           description: |
@@ -2767,7 +2772,7 @@ components:
           schema:
             $ref: '#/components/schemas/ResponseRegisteringEntity'
     POSTResponseCreditPortabilityPayment:
-      description: Dados dos contratos de empréstimo obtidos com sucesso.
+      description: Payload com os dadosda comunicação do pagamento efetuado a instituição credora.
       headers:
         x-fapi-interaction-id:
           description: |
@@ -2783,7 +2788,7 @@ components:
         application/jwt:
           schema:
             $ref: '#/components/schemas/POSTResponseCreditPortabilityPayment'
-    POSTResponseCreditPortabilityPaymentReversal:
+    POSTResponseCreditPortabilityRequestDischarge:
       description: Dados da solicita o estorno da STR efetuada para liquidar o contrato consignado.
       headers:
         x-fapi-interaction-id:
@@ -2799,7 +2804,7 @@ components:
       content:
         application/jwt:
           schema:
-            $ref: '#/components/schemas/POSTResponseCreditPortabilityPaymentReversal'
+            $ref: '#/components/schemas/POSTResponseCreditPortabilityRequestDischarge'
     BadRequest:
       description: A requisição foi malformada, omitindo atributos obrigatórios, seja no payload ou através de atributos na URL.
       headers:
@@ -3034,7 +3039,7 @@ components:
                     detail: Estado da portabilidade diferente de ACCEPTED_SETTLEMENT_IN_PROGRESS ou PAYMENT_ISSUE
                 meta:
                   requestDateTime: '2021-05-21T08:30:00Z'
-    UnprocessableEntityPostPaymentReversal:
+    UnprocessableEntityPostRequestDischarge:
       description: A sintaxe da requisição está correta, mas não foi possível processar as instruções presentes.
       headers:
         x-fapi-interaction-id:
@@ -3050,15 +3055,15 @@ components:
       content:
         application/jwt:
           schema:
-            $ref: '#/components/schemas/422ResponseErrorPostPaymentReversal'
+            $ref: '#/components/schemas/422ResponseErrorPostRequestDischarge'
           examples:
             Saldo insuficiente:
-              summary: DESAVERBACAO_POSSIVEL
+              summary:  SOLICITAÇÃO_NÃO_EFETUADA
               value:
                 errors:
-                  - code: DESAVERBACAO_POSSIVEL
-                    title: Desaverbação ainda no prazo do SLA de 10 dias.
-                    detail: Desaverbação ainda no prazo do SLA de 10 dias.
+                  - code:  SOLICITAÇÃO_NÃO_EFETUADA
+                    title: Máquina de estados acusa que ainda não está na etapa de desaverbação de contrato.
+                    detail: Máquina de estados acusa que ainda não está na etapa de desaverbação de contrato.
                 meta:
                   requestDateTime: '2021-05-21T08:30:00Z'
     SiteIsOverloaded:
