@@ -78,7 +78,7 @@ tags:
   - name: Registering Entity
     description: 'Fornece dados do contrato consignado junto a averbadora.'
   - name: Payments
-    description: 'Informa a Instituição Credora a respeito da liquidação efetuada através da STR exclusiva do OFB.'
+    description: 'Conjunto de endpoints relacionado ao pagamento via STR de um contrato de empréstimo.'
 paths:
   '/portabilities/{portabilityId}/account-data':
     get:
@@ -3100,3 +3100,4 @@ components:
         application/json; charset=utf-8:
           schema:
             $ref: '#/components/schemas/ResponseErrorWithAbleAdditionalProperties'
+
